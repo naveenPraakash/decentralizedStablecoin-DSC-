@@ -3,12 +3,12 @@
 pragma solidity ^0.8.18;
 
 import {Test} from "forge-std/Test.sol";
-import {DeployDSC} from "../../script/DeployDSC.s.sol";
+import {DeployDSC} from "../script/DeployDSC.s.sol";
 
-import {DecentralizedStablecoin} from "../../src/DecentralizedStablecoin.sol";
+import {DecentralizedStablecoin} from "../src/DecentralizedStablecoin.sol";
 
-import {DSCEngine} from "../../src/DSCEngine.sol";
-import {HelperConfig} from "../../script/HelperConfig.s.sol";
+import {DSCEngine} from "../src/DSCEngine.sol";
+import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 
 contract DSCEngineTest is Test {
