@@ -26,6 +26,7 @@ pragma solidity ^0.8.18;
 import {DecentralizedStablecoin} from "./DecentralizedStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 // import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 //import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -59,6 +60,10 @@ contract DSCEngine {
     error DSCEngine__MintFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFactorNotImproved();
+
+    ///////// types//////////
+
+    using OracleLib for AggregatorV3Interface;
 
     /////////////////////
     // State Variables //
@@ -358,6 +363,16 @@ contract DSCEngine {
     ////Internal////
     ////////////////
 
+    function _calculateHealthFactor(
+        uint256 totalDscMinted,
+        uint256 collateralValueInUsd
+    ) internal pure returns (uint256) {
+        if (totalDscMinted == 0) return type(uint256).max;
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd *
+            LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        return (collateralAdjustedForThreshold * 1e18) / totalDscMinted;
+    }
+
     function _redeemCollateral(
         address tokenCollateralAddress,
         uint256 amountCollateral,
@@ -433,10 +448,7 @@ contract DSCEngine {
 
         // Decimals dosent work in solidity..
 
-        uint256 collateralAdjustedForThreshold = (collateralValueInUsd *
-            LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
-
-        return (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
+        return _calculateHealthFactor(totalDSCMinted, collateralValueInUsd);
     }
 
     // 1. Check Health Factor (do they have enough Collateral)
@@ -465,7 +477,7 @@ contract DSCEngine {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(
             s_priceFeeds[token]
         );
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (, int256 price, , , ) = priceFeed.staleCheckLatestRoundData();
         return
             (USDamountInWei * PRECISION) /
             (uint256(price) * ADDITIONAL_FEED_PRECISION);
@@ -492,7 +504,7 @@ contract DSCEngine {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(
             s_priceFeeds[token]
         );
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (, int256 price, , , ) = priceFeed.staleCheckLatestRoundData();
 
         // 1ETH = $1000
         // The returned value from Cl will be 1000 * 1e8
@@ -509,5 +521,26 @@ contract DSCEngine {
         returns (uint256 totalDSCMinted, uint256 collateralValueInUsd)
     {
         (totalDSCMinted, collateralValueInUsd) = _getAccountInformation(user);
+    }
+
+    ////////////////////////
+    ////////getter//////////
+    ////////////////////////
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+    function getCollateralBalanceOfUser(
+        address user,
+        address token
+    ) external view returns (uint256) {
+        return s_collateralDeposited[user][token];
+    }
+
+    function getCollateralTokenPriceFeeds(
+        address token
+    ) external view returns (address) {
+        return s_priceFeeds[token];
     }
 }
